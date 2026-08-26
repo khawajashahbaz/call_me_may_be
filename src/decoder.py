@@ -1,5 +1,8 @@
+import numpy as np
+from typing import Dict, List, Set, Optional
+from pathlib import Path
+import json
 from enum import Enum, auto
-from typing import List, Optional
 from src.schemas import FunctionDefinition
 
 
@@ -96,6 +99,71 @@ class JSONStateTracker:
         """
         Updates the FSM state based on the newly completed token/string.
         """
-        # This is where you will transition from EXPECT_START -> EXPECT_NAME_KEY
+        # This is where you will transition
+        # from EXPECT_START -> EXPECT_NAME_KEY
         # once the "{" is fully formed.
         pass
+
+
+class VocabManager:
+    """
+    Manages token-to-string mappings and filters vocabulary based on target prefixes.
+    """
+
+    def __init__(self, vocab_path: str):
+        """
+        Loads the vocabulary mapping from the SDK's JSON file.
+
+        Args:
+            vocab_path (str): Path to the vocabulary JSON file.
+        """
+        self.vocab_path = Path(vocab_path)
+        self.id_to_token: Dict[int, str] = self._load_vocab()
+
+    def _load_vocab(self) -> Dict[int, str]:
+        """
+        Parses the vocabulary JSON file.
+
+        Returns:
+            Dict[int, str]: Mapping from token ID to token string.
+        """
+        with open(self.vocab_path, "r", encoding="utf-8") as f:
+            raw_vocab = json.load(f)
+
+        # Depending on SDK format, vocab can be {token_str: id} or {id_str: token_str}
+        parsed: Dict[int, str] = {}
+        for k, v in raw_vocab.items():
+            if isinstance(v, int):
+                # Format: {"token_string": token_id}
+                parsed[v] = k
+            else:
+                # Format: {"token_id": "token_string"}
+                parsed[int(k)] = str(v)
+        return parsed
+
+    def get_valid_token_ids(
+        self, current_buffer: str, allowed_targets: List[str]
+    ) -> Set[int]:
+        """
+        Finds all token IDs that produce a valid prefix for any allowed target.
+
+        Args:
+            current_buffer (str): The string accumulated so far in the current state.
+            allowed_targets (List[str]): Full candidate strings permitted by the grammar.
+
+        Returns:
+            Set[int]: Set of allowed token IDs.
+        """
+        valid_ids: Set[int] = set()
+
+        for token_id, token_str in self.id_to_token.items():
+            candidate = current_buffer + token_str
+
+            # Check if this candidate is a prefix of ANY target string
+            # OR if an allowed target is a prefix of candidate (e.g. multi-token jump)
+            for target in allowed_targets:
+                if target.startswith(candidate) or candidate.startswith(target):
+                    valid_ids.add(token_id)
+                    break
+
+        return valid_ids
