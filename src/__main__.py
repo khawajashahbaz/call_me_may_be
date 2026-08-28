@@ -94,7 +94,7 @@ def main() -> None:
         print(f"Failed to initialize Engine or LLM SDK: {e}")
         sys.exit(1)
 
-    # 2. Run the Generation Loop
+# 2. Run the Generation Loop
     results = []
     print("\nStarting generation loop...")
 
@@ -103,10 +103,8 @@ def main() -> None:
         print(f"Processing [{i+1}/{len(prompts)}]: {user_prompt}")
 
         try:
-            # Tell the FSM to generate the function call
             raw_call = engine.generate_function_call(user_prompt)
 
-            # Restructure it precisely to the mandatory output format
             formatted_result = {
                 "prompt": user_prompt,
                 "name": raw_call.get("name"),
@@ -117,8 +115,9 @@ def main() -> None:
                 f"  -> Extracted: {formatted_result['name']} with {len(formatted_result['parameters'])} params")
 
         except Exception as e:
-            # We catch errors to prevent an unhandled crash, satisfying the evaluation rubric
-            print(f"  -> Error generating call: {e}")
+            # TEMPORARY DEBUGGING FIX: Print the exact traceback
+            import traceback
+            traceback.print_exc()
             sys.exit(1)
 
     # 3. Save Final Results
