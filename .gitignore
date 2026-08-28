@@ -1,0 +1,16 @@
+# Environments
+.venv/
+env/
+venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+.mypy_cache/
+
+# Output Data (Required by the subject)
+data/output/
+function_calling_results.json
+
+# OS files
+.DS_Store
