@@ -115,10 +115,7 @@ def main() -> None:
                 f"  -> Extracted: {formatted_result['name']} with {len(formatted_result['parameters'])} params")
 
         except Exception as e:
-            # TEMPORARY DEBUGGING FIX: Print the exact traceback
-            import traceback
-            traceback.print_exc()
-            sys.exit(1)
+            print(f"  -> Error generating call: {e}")
 
     # 3. Save Final Results
     print(f"\nSaving {len(results)} valid results to {output_path}...")

@@ -35,7 +35,17 @@ class GenerationEngine:
         Generates a valid JSON function call strictly matching the definitions.
         """
         # 1. Encode the starting prompt
-        formatted_prompt = f"{prompt}\nGenerate the JSON function call for the above prompt:"
+        available_funcs = ""
+        for f in self.functions:
+            available_funcs += f"- {f.name}: {f.description}\n"
+
+        formatted_prompt = (
+            f"You are an AI that selects the correct function and extracts arguments.\n"
+            f"Available Functions:\n{available_funcs}\n"
+            f"User request: {prompt}\n"
+            f"Generate only the raw JSON output:\n"
+        )
+
         raw_input_ids = self.llm.encode(formatted_prompt)
 
         # --- 42 SDK FIX: Sanitize the output of encode() ---
@@ -60,26 +70,24 @@ class GenerationEngine:
             allowed_targets = fsm.get_allowed_strings()
 
             # 4. Ask VocabManager: "Which tokens can help me spell those strings?"
+            # 4. Ask VocabManager: "Which tokens can help me spell those strings?"
             valid_token_ids = self.vocab_manager.get_valid_token_ids(
                 current_buffer=fsm.text_buffer,
                 allowed_targets=allowed_targets
             )
 
             if not valid_token_ids:
-                # If we expect a dynamic parameter value (like a number), we use a different check
                 if fsm.state == GrammarState.EXPECT_PARAM_VALUE and fsm.selected_function and fsm.current_param_key:
                     param_type = fsm.selected_function.parameters[fsm.current_param_key].type
                     valid_token_ids = self.vocab_manager.get_value_token_ids(
                         current_buffer=fsm.text_buffer,
-                        param_type=param_type
+                        param_type=param_type,
+                        allowed_terminators=fsm.get_allowed_terminators()
                     )
 
                 if not valid_token_ids:
                     raise RuntimeError(
-                        f"Grammar dead end: No tokens found for buffer '{fsm.text_buffer}' "
-                        f"with allowed targets: {allowed_targets}"
-                    )
-
+                        f"Grammar dead end at buffer: '{fsm.text_buffer}'")
             # 5. Get raw logits from the LLM
             raw_logits_tensor = self.llm.get_logits_from_input_ids(input_ids)
 
@@ -104,27 +112,33 @@ class GenerationEngine:
             masked_logits = mask_logits(next_token_logits, valid_token_ids)
             next_token_id = int(sample_next_token(masked_logits))
 
-            # 7. Append the token to the sequence
+            # 7. Append the integer token to the sequence
             input_ids.append(next_token_id)
 
-            # 8. Decode the token to a string and update the buffer
-            token_str = self.vocab_manager.id_to_token[next_token_id]
-            fsm.text_buffer += token_str
-            generated_json_string += token_str
+            # 8. Update buffers
+            raw_token_str = self.vocab_manager.id_to_token[next_token_id]
+            fsm.text_buffer += raw_token_str
 
+            # FIX: Translate the raw BPE byte markers (Ġ = space, Ċ = newline) into
+            # standard characters so json.loads() doesn't crash at the end.
+            clean_str = raw_token_str.replace('Ġ', ' ').replace('Ċ', '\n')
+            generated_json_string += clean_str
+
+            # 9. Check if the buffer has completed a target
             # 9. Check if the buffer has perfectly completed one of the target strings
-            # Or if it's a dynamic value (number) that is now finished with a comma/brace
-            if fsm.text_buffer in allowed_targets:
+            if fsm.state == GrammarState.EXPECT_PARAM_VALUE:
+                clean_buf = fsm.text_buffer.replace(
+                    'Ġ', '').replace('Ċ', ' ').strip()
+                for term in fsm.get_allowed_terminators():
+                    if clean_buf.endswith(term):
+                        # Advance out of the value state
+                        fsm.advance_state(clean_buf[:-1])
+                        # Advance past the terminator character (comma or brace)
+                        fsm.text_buffer = term
+                        fsm.advance_state(term)
+                        break
+            elif fsm.text_buffer in allowed_targets:
                 fsm.advance_state(fsm.text_buffer)
-            elif fsm.state == GrammarState.EXPECT_PARAM_VALUE:
-                # If we are parsing a number, check if the LLM outputted the terminating comma or brace
-                if fsm.text_buffer.endswith(",") or fsm.text_buffer.endswith("}"):
-                    # Strip the terminating character, validate, and move state
-                    value_str = fsm.text_buffer[:-1].strip()
-                    fsm.advance_state(value_str)
-                    # Immediately process the terminating character
-                    fsm.text_buffer = fsm.text_buffer[-1]
-                    fsm.advance_state(fsm.text_buffer)
 
         # 10. Final parsing
         try:

@@ -162,6 +162,9 @@ class JSONStateTracker:
         elif self.state == GrammarState.EXPECT_PARAM_COLON:
             self.state = GrammarState.EXPECT_PARAM_VALUE
 
+        elif self.state == GrammarState.EXPECT_PARAM_VALUE:
+            self.state = GrammarState.EXPECT_PARAM_COMMA_OR_END
+
         elif self.state == GrammarState.EXPECT_PARAM_COMMA_OR_END:
             if matched_text == ",":
                 self.state = GrammarState.EXPECT_PARAM_KEY
@@ -170,6 +173,14 @@ class JSONStateTracker:
 
         elif self.state == GrammarState.EXPECT_END:
             self.state = GrammarState.DONE
+
+    def get_allowed_terminators(self) -> List[str]:
+        """Determines if the value should end with a comma (more params) or brace (done)."""
+        if not self.selected_function:
+            return ["}"]
+        if len(self.parsed_params) < len(self.selected_function.parameters):
+            return [","]  # Still missing arguments
+        return ["}"]      # All arguments filled
 
 
 class VocabManager:
@@ -206,56 +217,68 @@ class VocabManager:
     def get_valid_token_ids(
         self, current_buffer: str, allowed_targets: List[str]
     ) -> Set[int]:
-        """
-        Finds token IDs that produce a valid prefix for allowed targets.
-
-        Args:
-            current_buffer (str): Accumulated text in the current state.
-            allowed_targets (List[str]): Target strings permitted by grammar.
-
-        Returns:
-            Set[int]: Set of matching token IDs.
-        """
+        """Strictly filters tokens that build directly towards allowed targets."""
         valid_ids: Set[int] = set()
 
         for token_id, token_str in self.id_to_token.items():
             candidate = current_buffer + token_str
             for target in allowed_targets:
-                if target.startswith(candidate) or candidate.startswith(target):
+                # FIX: ONLY allow strict prefix matching. No overshooting!
+                if target.startswith(candidate):
                     valid_ids.add(token_id)
                     break
 
         return valid_ids
 
     def get_value_token_ids(
-        self, current_buffer: str, param_type: str
+        self, current_buffer: str, param_type: str, allowed_terminators: List[str]
     ) -> Set[int]:
-        """
-        Filters tokens for dynamic parameter values (numbers or strings).
-
-        Args:
-            current_buffer (str): Text generated so far for this value.
-            param_type (str): Expected data type ('number', 'string', etc.).
-
-        Returns:
-            Set[int]: Set of permitted token IDs.
-        """
         valid_ids: Set[int] = set()
 
         for token_id, token_str in self.id_to_token.items():
+            candidate = current_buffer + token_str
+            # Remove BPE space/newline markers for evaluation
+            clean = candidate.replace('Ġ', '').replace('Ċ', ' ').strip()
+
             if param_type == "number":
-                # Only allow numeric characters, decimals, negative signs, or trailing comma/brace
-                candidate = current_buffer + token_str
-                # Strip leading/trailing structural delimiters for validation
-                clean = candidate.rstrip(",}").strip()
-                if clean == "" or clean == "-" or self._is_partial_number(clean):
-                    valid_ids.add(token_id)
+                ends_with_term = False
+                for term in allowed_terminators:
+                    if clean.endswith(term):
+                        num_part = clean[:-1].strip()
+                        if num_part in ["", "-"] or self._is_partial_number(num_part):
+                            valid_ids.add(token_id)
+                        ends_with_term = True
+                        break
+
+                if not ends_with_term:
+                    if clean in ["", "-"] or self._is_partial_number(clean):
+                        valid_ids.add(token_id)
+
             elif param_type == "string":
-                # Must start with quotes, continue with chars, and end with quotes
-                if not current_buffer and token_str.startswith('"'):
+                # 1. Ignore whitespace before the opening quote
+                if not clean.startswith('"'):
+                    if clean == "":
+                        valid_ids.add(token_id)
+                    continue
+
+                # 2. Split by unescaped quotes to separate string content from terminators
+                parts = clean.replace('\\"', '').split('"')
+
+                if len(parts) == 2:
+                    # Only the opening quote exists; we are safely inside the string
                     valid_ids.add(token_id)
-                elif current_buffer.startswith('"'):
-                    valid_ids.add(token_id)
+                elif len(parts) >= 3:
+                    # The string is closed. Check what comes AFTER the closing quote.
+                    after_quote = parts[2].strip()
+
+                    if after_quote == "":
+                        valid_ids.add(token_id)
+                    else:
+                        # Strictly enforce that trailing characters build towards the allowed terminator
+                        for term in allowed_terminators:
+                            if term.startswith(after_quote):
+                                valid_ids.add(token_id)
+                                break
 
         return valid_ids
 
