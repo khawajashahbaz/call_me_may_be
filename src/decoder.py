@@ -237,11 +237,11 @@ class VocabManager:
 
         for token_id, token_str in self.id_to_token.items():
             candidate = current_buffer + token_str
-            # Remove BPE space/newline markers for evaluation
             clean = candidate.replace('Ġ', '').replace('Ċ', ' ').strip()
 
             if param_type == "number":
                 ends_with_term = False
+                # 1. Always allow terminators if the number before it is valid
                 for term in allowed_terminators:
                     if clean.endswith(term):
                         num_part = clean[:-1].strip()
@@ -250,31 +250,27 @@ class VocabManager:
                         ends_with_term = True
                         break
 
-                if not ends_with_term:
+                # 2. SAFETY VALVE: Only allow adding more digits if the number is short
+                is_too_long = len(clean) > 15
+                if not ends_with_term and not is_too_long:
                     if clean in ["", "-"] or self._is_partial_number(clean):
                         valid_ids.add(token_id)
 
             elif param_type == "string":
-                # 1. Ignore whitespace before the opening quote
                 if not clean.startswith('"'):
                     if clean == "":
                         valid_ids.add(token_id)
                     continue
 
-                # 2. Split by unescaped quotes to separate string content from terminators
                 parts = clean.replace('\\"', '').split('"')
 
                 if len(parts) == 2:
-                    # Only the opening quote exists; we are safely inside the string
                     valid_ids.add(token_id)
                 elif len(parts) >= 3:
-                    # The string is closed. Check what comes AFTER the closing quote.
                     after_quote = parts[2].strip()
-
                     if after_quote == "":
                         valid_ids.add(token_id)
                     else:
-                        # Strictly enforce that trailing characters build towards the allowed terminator
                         for term in allowed_terminators:
                             if term.startswith(after_quote):
                                 valid_ids.add(token_id)
