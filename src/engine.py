@@ -4,13 +4,8 @@ import numpy as np
 
 from llm_sdk import Small_LLM_Model
 from src.schemas import FunctionDefinition
-from src.decoder import (
-    GrammarState,
-    JSONStateTracker,
-    VocabManager,
-    mask_logits,
-    sample_next_token
-)
+from src.decoder import GrammarState, JSONStateTracker, mask_logits, sample_next_token
+from src.vocab import VocabManager
 
 
 class GenerationEngine:
