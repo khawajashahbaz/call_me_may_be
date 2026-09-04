@@ -4,7 +4,11 @@ import numpy as np
 
 from llm_sdk import Small_LLM_Model
 from src.schemas import FunctionDefinition
-from src.decoder import GrammarState, JSONStateTracker, mask_logits, sample_next_token
+from src.decoder import (
+    GrammarState,
+    JSONStateTracker,
+    mask_logits,
+    sample_next_token)
 from src.vocab import VocabManager
 
 
@@ -35,7 +39,8 @@ class GenerationEngine:
             available_funcs += f"- {f.name}: {f.description}\n"
 
         formatted_prompt = (
-            f"You are an AI that selects the correct function and extracts arguments.\n"
+            f"You are an AI that selects the"
+            f"correct function and extracts arguments.\n"
             f"Available Functions:\n{available_funcs}\n"
             f"User request: {prompt}\n"
             f"Generate only the raw JSON output:\n"
@@ -53,7 +58,7 @@ class GenerationEngine:
             input_ids = [int(tok) for tok in raw_input_ids]
         # ---------------------------------------------------
 
-        # 2. Initialize the FSM for this specific generation (THIS WAS MISSING!)
+        # 2. Initialize the FSM for this specific generation
         fsm = JSONStateTracker(self.functions)
         generated_json_string = ""
 
@@ -64,8 +69,8 @@ class GenerationEngine:
             # 3. Ask FSM: "What strings are legally allowed right now?"
             allowed_targets = fsm.get_allowed_strings()
 
-            # 4. Ask VocabManager: "Which tokens can help me spell those strings?"
-            # 4. Ask VocabManager: "Which tokens can help me spell those strings?"
+            # 4. Ask VocabManager: "Which tokens can
+            # help me spell those strings?"
             valid_token_ids = self.vocab_manager.get_valid_token_ids(
                 current_buffer=fsm.text_buffer,
                 allowed_targets=allowed_targets
@@ -94,7 +99,8 @@ class GenerationEngine:
             else:
                 logits_np = np.array(raw_logits_tensor)
 
-            # Squeeze out the batch dimension: [1, seq_len, vocab] -> [seq_len, vocab]
+            # Squeeze out the batch dimension:
+            # [1, seq_len, vocab] -> [seq_len, vocab]
             logits_np = np.squeeze(logits_np)
 
             # We strictly want a 1D array of the VERY LAST token's predictions
@@ -114,13 +120,15 @@ class GenerationEngine:
             raw_token_str = self.vocab_manager.id_to_token[next_token_id]
             fsm.text_buffer += raw_token_str
 
-            # FIX: Translate the raw BPE byte markers (Ġ = space, Ċ = newline) into
+            # FIX: Translate the raw BPE
+            # byte markers (Ġ = space, Ċ = newline) into
             # standard characters so json.loads() doesn't crash at the end.
             clean_str = raw_token_str.replace('Ġ', ' ').replace('Ċ', '\n')
             generated_json_string += clean_str
 
             # 9. Check if the buffer has completed a target
-            # 9. Check if the buffer has perfectly completed one of the target strings
+            # 9. Check if the buffer has perfectly
+            # completed one of the target strings
             if fsm.state == GrammarState.EXPECT_PARAM_VALUE:
                 clean_buf = fsm.text_buffer.replace(
                     'Ġ', '').replace('Ċ', ' ').strip()
@@ -128,7 +136,8 @@ class GenerationEngine:
                     if clean_buf.endswith(term):
                         # Advance out of the value state
                         fsm.advance_state(clean_buf[:-1])
-                        # Advance past the terminator character (comma or brace)
+                        # Advance past the terminator
+                        # character (comma or brace)
                         fsm.text_buffer = term
                         fsm.advance_state(term)
                         break

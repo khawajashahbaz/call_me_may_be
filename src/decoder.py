@@ -5,7 +5,7 @@ Finite State Machine and vocabulary management for constrained JSON decoding.
 from enum import Enum, auto
 import numpy as np
 from src.schemas import FunctionDefinition
-from typing import List, Set
+from typing import List, Set, Optional
 
 
 class GrammarState(Enum):
@@ -100,7 +100,8 @@ class JSONStateTracker:
             if not self.selected_function:
                 return ["}"]
 
-            # If more parameters remain, expect a comma; otherwise, closing brace
+            # If more parameters remain,
+            # expect a comma; otherwise, closing brace
             total_params = len(self.selected_function.parameters)
             if len(self.parsed_params) < total_params:
                 return [","]
@@ -172,7 +173,10 @@ class JSONStateTracker:
             self.state = GrammarState.DONE
 
     def get_allowed_terminators(self) -> List[str]:
-        """Determines if the value should end with a comma (more params) or brace (done)."""
+        """
+        Determines if the value should end
+        with a comma (more params) or brace (done).
+        """
         if not self.selected_function:
             return ["}"]
         if len(self.parsed_params) < len(self.selected_function.parameters):

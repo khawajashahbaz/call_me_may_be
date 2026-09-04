@@ -70,7 +70,8 @@ class VocabManager:
                         ends_with_term = True
                         break
 
-                # 2. SAFETY VALVE: Only allow adding more digits if the number is short
+                # 2. SAFETY VALVE: Only allow adding
+                #  more digits if the number is short
                 is_too_long = len(clean) > 15
                 if not ends_with_term and not is_too_long:
                     if clean in ["", "-"] or self._is_partial_number(clean):
