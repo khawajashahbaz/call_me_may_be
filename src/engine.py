@@ -4,7 +4,7 @@ import numpy as np
 
 from llm_sdk import Small_LLM_Model
 from src.schemas import FunctionDefinition
-from src.decoder import (
+from src.fsm import (
     GrammarState,
     JSONStateTracker,
     mask_logits,
@@ -56,7 +56,6 @@ class GenerationEngine:
             input_ids = [int(tok) for tok in raw_input_ids[0]]
         else:
             input_ids = [int(tok) for tok in raw_input_ids]
-        # ---------------------------------------------------
 
         # 2. Initialize the FSM for this specific generation
         fsm = JSONStateTracker(self.functions)
