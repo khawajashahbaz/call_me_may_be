@@ -52,9 +52,13 @@ def load_prompts(filepath: Path) -> List[Dict[str, Any]]:
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        if not isinstance(data, list) or not all(isinstance(item, dict) and 'prompt' in item for item in data):
+        if (
+            not isinstance(data, list)
+            or not all(
+                isinstance(item, dict) and 'prompt' in item for item in data)):
             print(
-                "Error: Input file must be a JSON array of objects with a 'prompt' key.")
+                "Error: Input file must be a "
+                "JSON array of objects with a 'prompt' key.")
             sys.exit(1)
 
         return data
@@ -84,10 +88,12 @@ def main() -> None:
         sys.exit(1)
 
     print(
-        f"Successfully loaded {len(functions)} functions and {len(prompts)} prompts.")
+        f"Successfully loaded {len(functions)}"
+        f"functions and {len(prompts)} prompts.")
 
     # 1. Initialize Engine
-    print("Initializing Generation Engine (this will load the model into memory)...")
+    print("Initializing Generation "
+          "Engine (this will load the model into memory)...")
     try:
         engine = GenerationEngine(functions)
     except Exception as e:
@@ -112,7 +118,8 @@ def main() -> None:
             }
             results.append(formatted_result)
             print(
-                f"  -> Extracted: {formatted_result['name']} with {len(formatted_result['parameters'])} params")
+                f"  -> Extracted: {formatted_result['name']}"
+                f" with {len(formatted_result['parameters'])} params")
 
         except Exception as e:
             print(f"  -> Error generating call: {e}")

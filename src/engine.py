@@ -29,7 +29,9 @@ class GenerationEngine:
         vocab_path = self.llm.get_path_to_vocab_file()
         self.vocab_manager = VocabManager(vocab_path)
 
-    def generate_function_call(self, prompt: str, max_tokens: int = 200) -> Dict[str, Any]:
+    def generate_function_call(
+            self,
+            prompt: str, max_tokens: int = 200) -> Dict[str, Any]:
         """
         Generates a valid JSON function call strictly matching the definitions.
         """
@@ -52,7 +54,9 @@ class GenerationEngine:
         if hasattr(raw_input_ids, "tolist"):
             raw_input_ids = raw_input_ids.tolist()
 
-        if isinstance(raw_input_ids, list) and len(raw_input_ids) > 0 and isinstance(raw_input_ids[0], list):
+        if (
+                isinstance(raw_input_ids, list) and len(raw_input_ids) > 0
+                and isinstance(raw_input_ids[0], list)):
             input_ids = [int(tok) for tok in raw_input_ids[0]]
         else:
             input_ids = [int(tok) for tok in raw_input_ids]
@@ -76,8 +80,14 @@ class GenerationEngine:
             )
 
             if not valid_token_ids:
-                if fsm.state == GrammarState.EXPECT_PARAM_VALUE and fsm.selected_function and fsm.current_param_key:
-                    param_type = fsm.selected_function.parameters[fsm.current_param_key].type
+                if (fsm.state == GrammarState.EXPECT_PARAM_VALUE
+                        and fsm.selected_function and fsm.current_param_key):
+
+                    current_param = (
+                        fsm.selected_function.parameters[fsm.current_param_key]
+                    )
+
+                    param_type = current_param.type
                     valid_token_ids = self.vocab_manager.get_value_token_ids(
                         current_buffer=fsm.text_buffer,
                         param_type=param_type,
@@ -148,5 +158,6 @@ class GenerationEngine:
             return json.loads(generated_json_string)
         except json.JSONDecodeError as e:
             raise RuntimeError(
-                f"Failed to parse generated text into JSON. Raw text: '{generated_json_string}'"
+                f"Failed to parse generated text into JSON."
+                f"Raw text: '{generated_json_string}'"
             ) from e
