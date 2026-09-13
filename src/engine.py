@@ -41,11 +41,20 @@ class GenerationEngine:
             available_funcs += f"- {f.name}: {f.description}\n"
 
         formatted_prompt = (
-            f"You are an AI that selects the"
-            f"correct function and extracts arguments.\n"
-            f"Available Functions:\n{available_funcs}\n"
-            f"User request: {prompt}\n"
-            f"Generate only the raw JSON output:\n"
+            "You are an expert tool caller. "
+            "Select the single best function from the list below "
+            "to fulfill the user's request, and output its arguments.\n\n"
+            "Available Functions:\n"
+        )
+
+        for f in self.functions:
+            param_names = ", ".join(f.parameters.keys())
+            formatted_prompt += f"- {f.name}({param_names}): {f.description}\n"
+
+        formatted_prompt += (
+            f"\nUser Request: {prompt}\n"
+            "Respond ONLY with the JSON object for the function call.\n"
+            '{"name":'
         )
 
         raw_input_ids = self.llm.encode(formatted_prompt)
