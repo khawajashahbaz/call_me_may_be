@@ -37,7 +37,8 @@ class VocabManager:
     def get_valid_token_ids(
         self, current_buffer: str, allowed_targets: List[str]
     ) -> Set[int]:
-        """Strictly filters tokens that build directly towards allowed targets."""
+        """Strictly filters tokens
+        that build directly towards allowed targets."""
         valid_ids: Set[int] = set()
 
         for token_id, token_str in self.id_to_token.items():
@@ -51,7 +52,8 @@ class VocabManager:
         return valid_ids
 
     def get_value_token_ids(
-        self, current_buffer: str, param_type: str, allowed_terminators: List[str]
+        self, current_buffer: str, param_type: str,
+        allowed_terminators: List[str]
     ) -> Set[int]:
         valid_ids: Set[int] = set()
 

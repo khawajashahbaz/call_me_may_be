@@ -35,16 +35,32 @@ class GenerationEngine:
         """
         Generates a valid JSON function call strictly matching the definitions.
         """
-        # 1. Encode the starting prompt
+        # 1. Encode the starting prompt WITH the escape hatch instruction
         available_funcs = ""
         for f in self.functions:
-            available_funcs += f"- {f.name}: {f.description}\n"
+            param_names = ", ".join(f.parameters.keys())
+            available_funcs += f"- {f.name}({param_names}): {f.description}\n"
+
+        # ADD 'none' DIRECTLY TO THE TOOL LIST
+        available_funcs = ""
+        for f in self.functions:
+            param_names = ", ".join(f.parameters.keys())
+            available_funcs += f"- {f.name}({param_names}): {f.description}\n"
+
+        available_funcs += "- fn_none(): Select this tool if"
+        "NO other function matches the user request.\n"
 
         formatted_prompt = (
-            "You are an expert tool caller. "
-            "Select the single best function from the list below "
-            "to fulfill the user's request, and output its arguments.\n\n"
-            "Available Functions:\n"
+            "You are an expert tool caller. Select the single"
+            f"best function from the list below.\n\n"
+            f"Available Functions:\n{available_funcs}\n"
+            "--- Example ---\n"
+            "User request: Bake me a chocolate cake\n"
+            '{"name": "fn_none"}\n'
+            "--- End Example ---\n\n"
+            f"User request: {prompt}\n"
+            "Respond ONLY with the JSON object for the function call.\n"
+            '{"name":'
         )
 
         for f in self.functions:
@@ -164,9 +180,17 @@ class GenerationEngine:
 
         # 10. Final parsing
         try:
-            return json.loads(generated_json_string)
+            parsed_json = json.loads(generated_json_string)
+
+            # Catch the new pattern
+            if parsed_json.get("name") == "fn_none":
+                raise ValueError(
+                    f"No matching function available"
+                    f"for the prompt: '{prompt}'")
+
+            return parsed_json
+
         except json.JSONDecodeError as e:
             raise RuntimeError(
-                f"Failed to parse generated text into JSON."
-                f"Raw text: '{generated_json_string}'"
-            ) from e
+                f"Failed to parse generated text."
+                f" Raw text: '{generated_json_string}'") from e

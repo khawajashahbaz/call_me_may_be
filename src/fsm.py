@@ -61,7 +61,9 @@ class JSONStateTracker:
             return [":"]
 
         if self.state == GrammarState.EXPECT_NAME_VALUE:
-            return [f'"{f.name}"' for f in self.functions]
+            allowed = [f'"{f.name}"' for f in self.functions]
+            allowed.append('"fn_none"')  # Tricking the pattern matcher
+            return allowed
 
         if self.state == GrammarState.EXPECT_NAME_COMMA:
             return [","]
@@ -131,11 +133,15 @@ class JSONStateTracker:
             self.state = GrammarState.EXPECT_NAME_VALUE
 
         elif self.state == GrammarState.EXPECT_NAME_VALUE:
-            func_name = matched_text.strip('"')
-            self.selected_function = next(
-                (f for f in self.functions if f.name == func_name), None
-            )
-            self.state = GrammarState.EXPECT_NAME_COMMA
+            clean_name = matched_text.strip('"')
+
+            if clean_name == "fn_none":
+                self.selected_function = None
+                self.state = GrammarState.EXPECT_END
+            else:
+                self.selected_function = next(
+                    (f for f in self.functions if f.name == clean_name), None)
+                self.state = GrammarState.EXPECT_NAME_COMMA
 
         elif self.state == GrammarState.EXPECT_NAME_COMMA:
             self.state = GrammarState.EXPECT_PARAMS_KEY

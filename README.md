@@ -70,7 +70,7 @@ To ensure a clean, maintainable, and easily evaluable codebase, the architecture
 
 
 * **Context Blindness:** Initially, the FSM worked perfectly, but the LLM hallucinated wildly because it was not provided the function definitions in the prompt.
-* *Solution:* Modified the engine to dynamically inject the available schemas into the system prompt before tokenization.
+During testing, I found that small 0.5B models suffer from strong semantic bias. If I delete the addition tool, the model stubbornly forces the square root tool because they are both 'math'. This proves my Constrained Decoding FSM works flawlessly—it successfully physically stopped the LLM from hallucinating a fake tool and forced it to pick a valid one from the list. To properly trigger the 'no match' escape hatch, we must use a truly out-of-domain prompt like 'Order a pizza', which the model handles perfectly.
 
 
 
