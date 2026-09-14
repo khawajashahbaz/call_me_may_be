@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+import os
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -123,14 +124,27 @@ def main() -> None:
 
         except Exception as e:
             print(f"  -> Error generating call: {e}")
+            # FIX: Append a fallback so the list length matches the input exactly!
+            fallback_result = {
+                "prompt": user_prompt,
+                "error": str(e)
+            }
+            results.append(fallback_result)
 
     # 3. Save Final Results
     print(f"\nSaving {len(results)} valid results to {output_path}...")
     try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            # We use indent=2 for clean, readable JSON
-            json.dump(results, f, indent=2)
-        print("Done! Output generated successfully.")
+        output_path = args.output
+        output_dir = os.path.dirname(output_path)
+
+        # Create the directory safely if it doesn't exist
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=4)
+
+        print(f"Done! Output generated successfully at {output_path}")
     except Exception as e:
         print(f"Error saving output file: {e}")
         sys.exit(1)

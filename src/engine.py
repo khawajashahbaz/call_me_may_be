@@ -182,15 +182,18 @@ class GenerationEngine:
         try:
             parsed_json = json.loads(generated_json_string)
 
-            # Catch the new pattern
-            if parsed_json.get("name") == "fn_none":
-                raise ValueError(
-                    f"No matching function available"
-                    f"for the prompt: '{prompt}'")
+            # FIX: Cast types based on the schema
+            func_name = parsed_json.get("name")
+            func_def = next(
+                (f for f in self.functions if f.name == func_name), None)
+
+            if func_def and "parameters" in parsed_json:
+                for key, val in parsed_json["parameters"].items():
+                    if key in func_def.parameters:
+                        # If schema wants a float (number) but LLM output an int, cast it
+                        if func_def.parameters[key].type == "number" and isinstance(val, int):
+                            parsed_json["parameters"][key] = float(val)
 
             return parsed_json
-
         except json.JSONDecodeError as e:
-            raise RuntimeError(
-                f"Failed to parse generated text."
-                f" Raw text: '{generated_json_string}'") from e
+            raise RuntimeError(f"Failed to parse generated text...") from e

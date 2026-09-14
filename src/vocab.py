@@ -61,13 +61,14 @@ class VocabManager:
             candidate = current_buffer + token_str
             clean = candidate.replace('Ġ', '').replace('Ċ', ' ').strip()
 
-            if param_type == "number":
+            if param_type in ["number", "integer"]:
                 ends_with_term = False
                 # 1. Always allow terminators if the number before it is valid
                 for term in allowed_terminators:
                     if clean.endswith(term):
                         num_part = clean[:-1].strip()
-                        if num_part in ["", "-"] or self._is_partial_number(num_part):
+                        if (num_part in ["", "-"] or
+                                self._is_partial_number(num_part)):
                             valid_ids.add(token_id)
                         ends_with_term = True
                         break
@@ -98,7 +99,8 @@ class VocabManager:
                             if term.startswith(after_quote):
                                 valid_ids.add(token_id)
                                 break
-
+            elif param_type == "boolean":
+                return ['"true"', '"false"', 'true', 'false']
         return valid_ids
 
     @staticmethod
