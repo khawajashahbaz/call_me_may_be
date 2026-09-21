@@ -41,18 +41,10 @@ class GenerationEngine:
             param_names = ", ".join(f.parameters.keys())
             available_funcs += f"- {f.name}({param_names}): {f.description}\n"
 
-        # ADD 'none' DIRECTLY TO THE TOOL LIST
-        available_funcs = ""
-        for f in self.functions:
-            param_names = ", ".join(f.parameters.keys())
-            available_funcs += f"- {f.name}({param_names}): {f.description}\n"
-
-        available_funcs += "- fn_none(): Select this tool if"
-        "NO other function matches the user request.\n"
+        available_funcs += "- fn_none(): Select this tool if NO other function matches the user request.\n"
 
         formatted_prompt = (
-            "You are an expert tool caller. Select the single"
-            f"best function from the list below.\n\n"
+            "You are an expert tool caller. Select the single best function from the list below.\n\n"
             f"Available Functions:\n{available_funcs}\n"
             "--- Example ---\n"
             "User request: Bake me a chocolate cake\n"
@@ -60,19 +52,8 @@ class GenerationEngine:
             "--- End Example ---\n\n"
             f"User request: {prompt}\n"
             "Respond ONLY with the JSON object for the function call.\n"
-            '{"name":'
         )
-
-        for f in self.functions:
-            param_names = ", ".join(f.parameters.keys())
-            formatted_prompt += f"- {f.name}({param_names}): {f.description}\n"
-
-        formatted_prompt += (
-            f"\nUser Request: {prompt}\n"
-            "Respond ONLY with the JSON object for the function call.\n"
-            '{"name":'
-        )
-
+        
         raw_input_ids = self.llm.encode(formatted_prompt)
 
         # --- 42 SDK FIX: Sanitize the output of encode() ---

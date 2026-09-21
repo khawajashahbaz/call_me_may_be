@@ -7,22 +7,20 @@ class VocabManager:
     """Manages token-to-string mappings and logit masking."""
 
     def __init__(self, vocab_path: str):
-        """
-        Loads vocabulary mapping from a JSON file.
-
-        Args:
-            vocab_path (str): Path to vocabulary JSON file.
-        """
+        """Loads vocabulary mapping from a JSON file."""
         self.vocab_path = Path(vocab_path)
         self.id_to_token: Dict[int, str] = self._load_vocab()
+        
+        # --- HUGE PERFORMANCE OPTIMIZATION ---
+        # Pre-clean all 150,000 tokens exactly ONCE at startup.
+        # This prevents 66+ million string replacements during generation.
+        self.id_to_clean_token: Dict[int, str] = {
+            t_id: t_str.replace('Ġ', '').replace('Ċ', ' ')
+            for t_id, t_str in self.id_to_token.items()
+        }
 
     def _load_vocab(self) -> Dict[int, str]:
-        """
-        Parses vocabulary mapping.
-
-        Returns:
-            Dict[int, str]: Mapping from token ID to token string.
-        """
+        """Parses vocabulary mapping."""
         with open(self.vocab_path, "r", encoding="utf-8") as f:
             raw_vocab: Dict[str, Any] = json.load(f)
 
@@ -37,14 +35,12 @@ class VocabManager:
     def get_valid_token_ids(
         self, current_buffer: str, allowed_targets: List[str]
     ) -> Set[int]:
-        """Strictly filters tokens
-        that build directly towards allowed targets."""
+        """Strictly filters tokens that build directly towards allowed targets."""
         valid_ids: Set[int] = set()
 
         for token_id, token_str in self.id_to_token.items():
             candidate = current_buffer + token_str
             for target in allowed_targets:
-                # FIX: ONLY allow strict prefix matching. No overshooting!
                 if target.startswith(candidate):
                     valid_ids.add(token_id)
                     break
@@ -56,25 +52,26 @@ class VocabManager:
         allowed_terminators: List[str]
     ) -> Set[int]:
         valid_ids: Set[int] = set()
+        
+        # Clean the current buffer ONCE per step, not 150,000 times
+        clean_buffer = current_buffer.replace('Ġ', '').replace('Ċ', ' ').strip()
 
-        for token_id, token_str in self.id_to_token.items():
-            candidate = current_buffer + token_str
-            clean = candidate.replace('Ġ', '').replace('Ċ', ' ').strip()
+        # Iterate over the PRE-CLEANED tokens
+        for token_id, clean_token_str in self.id_to_clean_token.items():
+            clean = clean_buffer + clean_token_str
+            clean = clean.strip()
 
             if param_type in ["number", "integer"]:
                 ends_with_term = False
-                # 1. Always allow terminators if the number before it is valid
                 for term in allowed_terminators:
                     if clean.endswith(term):
                         num_part = clean[:-1].strip()
-                        if (num_part in ["", "-"] or
-                                self._is_partial_number(num_part)):
+                        if (num_part in ["", "-"]
+                                or self._is_partial_number(num_part)):
                             valid_ids.add(token_id)
                         ends_with_term = True
                         break
 
-                # 2. SAFETY VALVE: Only allow adding
-                #  more digits if the number is short
                 is_too_long = len(clean) > 15
                 if not ends_with_term and not is_too_long:
                     if clean in ["", "-"] or self._is_partial_number(clean):
@@ -99,8 +96,14 @@ class VocabManager:
                             if term.startswith(after_quote):
                                 valid_ids.add(token_id)
                                 break
+
             elif param_type == "boolean":
-                return ['"true"', '"false"', 'true', 'false']
+                # Fixed to allow safe type parsing while remaining fast
+                for b_val in ['true', 'false', '"true"', '"false"']:
+                    if b_val.startswith(clean) or clean.startswith(b_val):
+                        valid_ids.add(token_id)
+                        break
+
         return valid_ids
 
     @staticmethod
